@@ -11,7 +11,7 @@ import torchvision
 
 from fvcore.nn import sigmoid_focal_loss_jit
 
-from models.losses import FocalLoss, TripletLoss
+from models.losses import FocalLoss, TripletLoss, AsymmetricLoss
 from models.losses import RegL1Loss, RegLoss, NormRegL1Loss, RegWeightedL1Loss
 from models.decode import mot_decode
 from models.utils import _sigmoid, _tranpose_and_gather_feat
@@ -22,7 +22,12 @@ from .base_trainer import BaseTrainer
 class MotLoss(torch.nn.Module):
     def __init__(self, opt):
         super(MotLoss, self).__init__()
-        self.crit = torch.nn.MSELoss() if opt.mse_loss else FocalLoss()
+
+        # heat map head
+        #self.crit = torch.nn.MSELoss() if opt.mse_loss else FocalLoss()
+        self.crit = AsymmetricLoss()
+
+        # box offset head
         self.crit_reg = RegL1Loss() if opt.reg_loss == 'l1' else \
             RegLoss() if opt.reg_loss == 'sl1' else None
         self.crit_wh = torch.nn.L1Loss(reduction='sum') if opt.dense_wh else \
@@ -32,6 +37,7 @@ class MotLoss(torch.nn.Module):
         self.emb_dim = opt.reid_dim
         self.nID = opt.nID
         self.classifier = nn.Linear(self.emb_dim, self.nID)
+        # Re id loss head
         if opt.id_loss == 'focal':
             torch.nn.init.normal_(self.classifier.weight, std=0.01)
             prior_prob = 0.01
